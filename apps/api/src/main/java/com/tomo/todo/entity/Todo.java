@@ -60,6 +60,26 @@ public class Todo {
 
   protected Todo() {}
 
+  private Todo(
+      String userId,
+      String title,
+      String categoryName,
+      TodoPriority priority,
+      LocalDate dueDate,
+      int estimatedMinutes,
+      LocalDateTime reminderAt,
+      LocalDateTime createdAt) {
+    this.userId = userId;
+    this.title = title;
+    this.categoryName = categoryName;
+    this.priority = priority;
+    this.dueDate = dueDate;
+    this.estimatedMinutes = estimatedMinutes;
+    this.reminderAt = reminderAt;
+    this.createdAt = createdAt;
+    this.updatedAt = createdAt;
+  }
+
   /**
    * 인증 사용자에게 속하는 미완료 To-do를 만든다.
    *
@@ -82,17 +102,8 @@ public class Todo {
       int estimatedMinutes,
       LocalDateTime reminderAt,
       LocalDateTime createdAt) {
-    Todo todo = new Todo();
-    todo.userId = userId;
-    todo.title = title;
-    todo.categoryName = categoryName;
-    todo.priority = priority;
-    todo.dueDate = dueDate;
-    todo.estimatedMinutes = estimatedMinutes;
-    todo.reminderAt = reminderAt;
-    todo.createdAt = createdAt;
-    todo.updatedAt = createdAt;
-    return todo;
+    return new Todo(
+        userId, title, categoryName, priority, dueDate, estimatedMinutes, reminderAt, createdAt);
   }
 
   @PreUpdate
