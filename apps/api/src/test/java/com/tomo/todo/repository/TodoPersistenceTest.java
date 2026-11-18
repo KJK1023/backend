@@ -31,7 +31,7 @@ class TodoPersistenceTest {
     entityManager.flush();
     LocalDateTime now = LocalDateTime.of(2026, 11, 13, 12, 0);
     Todo saved =
-        todoRepository.saveAndFlush(
+        todoRepository.save(
             Todo.create(
                 user.getId(),
                 "자료구조",
@@ -41,6 +41,7 @@ class TodoPersistenceTest {
                 60,
                 now.plusHours(1),
                 now));
+    entityManager.flush();
     entityManager.clear();
     // when
     Todo found =
@@ -88,9 +89,9 @@ class TodoPersistenceTest {
     assertThat(todoRepository.findByIdAndDeletedAtIsNull(saved.getId())).isEmpty();
     assertThat(todoRepository.findByIdAndUserIdAndDeletedAtIsNull(saved.getId(), user.getId()))
         .isEmpty();
-    assertThat(todoRepository.findById(saved.getId()))
-        .get()
-        .extracting(Todo::getTitle)
-        .isEqualTo("자료구조");
+    Todo retained = entityManager.find(Todo.class, saved.getId());
+    assertThat(retained).isNotNull();
+    assertThat(retained.getTitle()).isEqualTo("자료구조");
+    assertThat(retained.getDeletedAt()).isEqualTo(now);
   }
 }

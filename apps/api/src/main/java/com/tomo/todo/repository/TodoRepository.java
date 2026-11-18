@@ -2,10 +2,28 @@ package com.tomo.todo.repository;
 
 import com.tomo.todo.entity.Todo;
 import java.util.Optional;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.repository.Repository;
 
-/** To-do의 저장과 조회를 담당한다. */
-public interface TodoRepository extends JpaRepository<Todo, Long> {
+/** 기록 보존을 위해 물리 삭제를 노출하지 않고 To-do 저장과 조회만 제공한다. */
+public interface TodoRepository extends Repository<Todo, Long> {
+  /**
+   * To-do를 저장한다.
+   *
+   * @param <S> 저장할 To-do 타입
+   * @param entity 저장할 To-do
+   * @return 저장된 To-do
+   */
+  <S extends Todo> S save(S entity);
+
+  /**
+   * To-do를 저장하고 변경 내용을 DB에 반영한다.
+   *
+   * @param <S> 저장할 To-do 타입
+   * @param entity 저장할 To-do
+   * @return 저장된 To-do
+   */
+  <S extends Todo> S saveAndFlush(S entity);
+
   /**
    * 삭제되지 않은 To-do를 조회한다. 소유권은 호출 측에서 별도로 검증한다.
    *
