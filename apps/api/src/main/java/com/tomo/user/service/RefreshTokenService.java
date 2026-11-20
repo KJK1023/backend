@@ -1,7 +1,7 @@
 package com.tomo.user.service;
 
 import com.tomo.common.exception.BusinessException;
-import com.tomo.common.exception.ErrorCode;
+import com.tomo.common.exception.CommonErrorCode;
 import com.tomo.integration.redis.RedisStringClient;
 import com.tomo.user.entity.LoginSession;
 import com.tomo.user.repository.LoginSessionRepository;
@@ -21,11 +21,14 @@ import java.util.HexFormat;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /** 로그인 세션에 연결된 Refresh Token의 발급, 검증, 폐기를 담당한다. */
 @Service
 public class RefreshTokenService {
+  private static final Logger LOG = LoggerFactory.getLogger(RefreshTokenService.class);
   private static final String KEY_PREFIX = "auth:refresh:session:";
   private static final String REVOKED_VALUE = "__REVOKED__";
   private static final int RANDOM_BYTES = 32;
@@ -74,27 +77,27 @@ public class RefreshTokenService {
    */
   public String issue(String userId, long sessionId) {
     if (userId == null || userId.isBlank() || sessionId <= 0) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
+      throw new BusinessException(CommonErrorCode.INVALID_REQUEST);
     }
 
     LoginSession session =
         loginSessionRepository
             .findById(sessionId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+            .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
 
     if (!userId.equals(session.getUserId())) {
-      throw new BusinessException(ErrorCode.UNAUTHORIZED);
+      throw new BusinessException(CommonErrorCode.UNAUTHORIZED);
     }
 
     Instant expiresAt = session.getExpiresAt().toInstant(ZoneOffset.UTC);
     Duration ttl = Duration.between(clock.instant(), expiresAt);
 
     if (ttl.isZero() || ttl.isNegative()) {
-      throw new BusinessException(ErrorCode.UNAUTHORIZED);
+      throw new BusinessException(CommonErrorCode.UNAUTHORIZED);
     }
 
     if (!loginSessionService.isValidAccessSession(userId, sessionId)) {
-      throw new BusinessException(ErrorCode.UNAUTHORIZED);
+      throw new BusinessException(CommonErrorCode.UNAUTHORIZED);
     }
 
     String token = newToken(sessionId);
@@ -102,13 +105,19 @@ public class RefreshTokenService {
     boolean stored = redisStringClient.setIfAbsent(key(sessionId), hash(token), ttl);
 
     if (!stored) {
-      throw new BusinessException(ErrorCode.RESOURCE_CONFLICT);
+      LOG.debug("Refresh Token 중복 발급 거부. sessionId={}", sessionId);
+      throw new BusinessException(CommonErrorCode.RESOURCE_CONFLICT);
     }
 
     if (!loginSessionService.isValidAccessSession(userId, sessionId)) {
-      redisStringClient.deleteIfMatches(key(sessionId), hash(token));
-      throw new BusinessException(ErrorCode.UNAUTHORIZED);
+      boolean removed = redisStringClient.deleteIfMatches(key(sessionId), hash(token));
+
+      LOG.warn("Refresh Token 발급 후 세션 무효화. sessionId={}, tokenRemoved={}", sessionId, removed);
+
+      throw new BusinessException(CommonErrorCode.UNAUTHORIZED);
     }
+
+    LOG.info("Refresh Token 발급 완료. sessionId={}", sessionId);
 
     return token;
   }
@@ -124,13 +133,13 @@ public class RefreshTokenService {
     long sessionId = parseSessionId(currentToken);
 
     if (sessionId <= 0) {
-      throw new BusinessException(ErrorCode.INVALID_ACCESS_TOKEN);
+      throw new BusinessException(CommonErrorCode.INVALID_ACCESS_TOKEN);
     }
 
     LoginSession session =
         loginSessionRepository
             .findById(sessionId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_ACCESS_TOKEN));
+            .orElseThrow(() -> new BusinessException(CommonErrorCode.INVALID_ACCESS_TOKEN));
 
     String userId = session.getUserId();
 
@@ -141,7 +150,7 @@ public class RefreshTokenService {
         || ttl.isNegative()
         || ttl.toMillis() < 1
         || !loginSessionService.isValidAccessSession(userId, sessionId)) {
-      throw new BusinessException(ErrorCode.INVALID_ACCESS_TOKEN);
+      throw new BusinessException(CommonErrorCode.INVALID_ACCESS_TOKEN);
     }
 
     String rotatedToken = newToken(sessionId);
@@ -151,58 +160,21 @@ public class RefreshTokenService {
             key(sessionId), hash(currentToken), hash(rotatedToken), ttl);
 
     if (!replaced) {
-      throw new BusinessException(ErrorCode.INVALID_ACCESS_TOKEN);
+      LOG.debug("Refresh Token 교체 거부. sessionId={}", sessionId);
+      throw new BusinessException(CommonErrorCode.INVALID_ACCESS_TOKEN);
     }
 
     if (!loginSessionService.isValidAccessSession(userId, sessionId)) {
-      redisStringClient.deleteIfMatches(key(sessionId), hash(rotatedToken));
-      throw new BusinessException(ErrorCode.INVALID_ACCESS_TOKEN);
+      boolean removed = redisStringClient.deleteIfMatches(key(sessionId), hash(rotatedToken));
+
+      LOG.warn("Refresh Token 교체 후 세션 무효화. sessionId={}, tokenRemoved={}", sessionId, removed);
+
+      throw new BusinessException(CommonErrorCode.INVALID_ACCESS_TOKEN);
     }
+
+    LOG.info("Refresh Token 교체 완료. sessionId={}", sessionId);
 
     return rotatedToken;
-  }
-
-  /**
-   * 검증된 사용자 세션에 Refresh Token을 재발급한다.
-   *
-   * <p>기존 토큰은 교체되어 더 이상 사용할 수 없다.
-   *
-   * @param userId 검증된 사용자 ID
-   * @param sessionId 로그인 세션 ID
-   * @return 재발급된 Refresh Token
-   * @throws BusinessException 사용자나 세션이 유효하지 않은 경우
-   */
-  public String reissue(String userId, long sessionId) {
-    if (userId == null || userId.isBlank() || sessionId <= 0) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
-    }
-
-    LoginSession session =
-        loginSessionRepository
-            .findById(sessionId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
-
-    if (!userId.equals(session.getUserId())) {
-      throw new BusinessException(ErrorCode.UNAUTHORIZED);
-    }
-
-    Duration ttl =
-        Duration.between(clock.instant(), session.getExpiresAt().toInstant(ZoneOffset.UTC));
-
-    if (ttl.toMillis() <= 0 || !loginSessionService.isValidAccessSession(userId, sessionId)) {
-      throw new BusinessException(ErrorCode.UNAUTHORIZED);
-    }
-
-    String token = newToken(sessionId);
-
-    boolean replaced =
-        redisStringClient.replaceUnlessRevoked(key(sessionId), REVOKED_VALUE, hash(token), ttl);
-
-    if (!replaced) {
-      throw new BusinessException(ErrorCode.UNAUTHORIZED);
-    }
-
-    return token;
   }
 
   /**
@@ -251,7 +223,7 @@ public class RefreshTokenService {
    */
   void revokeBeforeSessionDeletion(long sessionId, LocalDateTime expiresAt) {
     if (sessionId <= 0 || expiresAt == null) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
+      throw new BusinessException(CommonErrorCode.INVALID_REQUEST);
     }
 
     Duration ttl = Duration.between(clock.instant(), expiresAt.toInstant(ZoneOffset.UTC));
@@ -261,6 +233,8 @@ public class RefreshTokenService {
     }
 
     redisStringClient.set(key(sessionId), REVOKED_VALUE, ttl);
+
+    LOG.info("Refresh Token 폐기 완료. sessionId={}", sessionId);
   }
 
   private String newToken(long sessionId) {
