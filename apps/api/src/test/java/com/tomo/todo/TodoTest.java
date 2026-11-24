@@ -3,8 +3,10 @@ package com.tomo.todo;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.tomo.common.exception.CommonErrorCode;
 import com.tomo.todo.entity.Todo;
 import com.tomo.todo.entity.TodoPriority;
+import com.tomo.todo.exception.InvalidTodoEstimateException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.DisplayName;
@@ -67,8 +69,9 @@ class TodoTest {
                     estimatedMinutes,
                     null,
                     LocalDateTime.of(2026, 11, 13, 12, 0)))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("예상 학습시간은 0보다 커야 한다.");
+        .isInstanceOf(InvalidTodoEstimateException.class)
+        .extracting("errorCode")
+        .isEqualTo(CommonErrorCode.INVALID_REQUEST);
   }
 
   @Test

@@ -3,6 +3,10 @@ package com.tomo.todo.service;
 import com.tomo.common.exception.BusinessException;
 import com.tomo.common.exception.CommonErrorCode;
 import com.tomo.todo.entity.Todo;
+import com.tomo.todo.exception.InvalidTodoIdException;
+import com.tomo.todo.exception.TodoAccessDeniedException;
+import com.tomo.todo.exception.TodoErrorCode;
+import com.tomo.todo.exception.TodoNotFoundException;
 import com.tomo.todo.repository.TodoRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,28 +27,77 @@ public class TodoAccessService {
   }
 
   /**
-   * 삭제되지 않은 To-do를 조회하고 인증된 사용자의 소유인지 확인한다.
+   * 조회 대상인 삭제되지 않은 To-do의 소유권을 확인한다.
    *
    * @param userId 인증 계층에서 전달한 사용자 식별자
    * @param todoId To-do 식별자
    * @return 사용자 소유의 삭제되지 않은 To-do
-   * @throws BusinessException 입력이 유효하지 않으면 INVALID_REQUEST, 대상이 없으면 RESOURCE_NOT_FOUND, 소유자가 아니면
-   *     FORBIDDEN
+   * @throws BusinessException 사용자 식별자가 유효하지 않은 경우
+   * @throws InvalidTodoIdException To-do 식별자가 누락되었거나 양수가 아닌 경우
+   * @throws TodoNotFoundException 대상이 없거나 삭제된 경우
+   * @throws TodoAccessDeniedException 대상의 소유자가 아닌 경우
    */
   public Todo getOwnedTodo(String userId, Long todoId) {
+    return getOwnedTodo(userId, todoId, TodoErrorCode.TODO_VIEW_FORBIDDEN);
+  }
+
+  /**
+   * 수정 대상인 삭제되지 않은 To-do의 소유권을 확인한다.
+   *
+   * @param userId 인증 계층에서 전달한 사용자 식별자
+   * @param todoId To-do 식별자
+   * @return 사용자 소유의 삭제되지 않은 To-do
+   * @throws BusinessException 사용자 식별자가 유효하지 않은 경우
+   * @throws InvalidTodoIdException To-do 식별자가 누락되었거나 양수가 아닌 경우
+   * @throws TodoNotFoundException 대상이 없거나 삭제된 경우
+   * @throws TodoAccessDeniedException 대상의 소유자가 아닌 경우
+   */
+  public Todo getOwnedTodoForUpdate(String userId, Long todoId) {
+    return getOwnedTodo(userId, todoId, TodoErrorCode.TODO_UPDATE_FORBIDDEN);
+  }
+
+  /**
+   * 삭제 대상인 삭제되지 않은 To-do의 소유권을 확인한다.
+   *
+   * @param userId 인증 계층에서 전달한 사용자 식별자
+   * @param todoId To-do 식별자
+   * @return 사용자 소유의 삭제되지 않은 To-do
+   * @throws BusinessException 사용자 식별자가 유효하지 않은 경우
+   * @throws InvalidTodoIdException To-do 식별자가 누락되었거나 양수가 아닌 경우
+   * @throws TodoNotFoundException 대상이 없거나 삭제된 경우
+   * @throws TodoAccessDeniedException 대상의 소유자가 아닌 경우
+   */
+  public Todo getOwnedTodoForDelete(String userId, Long todoId) {
+    return getOwnedTodo(userId, todoId, TodoErrorCode.TODO_DELETE_FORBIDDEN);
+  }
+
+  /**
+   * 완료 상태 변경 대상인 삭제되지 않은 To-do의 소유권을 확인한다.
+   *
+   * @param userId 인증 계층에서 전달한 사용자 식별자
+   * @param todoId To-do 식별자
+   * @return 사용자 소유의 삭제되지 않은 To-do
+   * @throws BusinessException 사용자 식별자가 유효하지 않은 경우
+   * @throws InvalidTodoIdException To-do 식별자가 누락되었거나 양수가 아닌 경우
+   * @throws TodoNotFoundException 대상이 없거나 삭제된 경우
+   * @throws TodoAccessDeniedException 대상의 소유자가 아닌 경우
+   */
+  public Todo getOwnedTodoForCompletion(String userId, Long todoId) {
+    return getOwnedTodo(userId, todoId, TodoErrorCode.TODO_COMPLETION_FORBIDDEN);
+  }
+
+  private Todo getOwnedTodo(String userId, Long todoId, TodoErrorCode forbiddenCode) {
     if (userId == null || userId.isBlank()) {
       throw new BusinessException(CommonErrorCode.INVALID_REQUEST);
     }
     if (todoId == null || todoId <= 0) {
-      throw new BusinessException(CommonErrorCode.INVALID_REQUEST);
+      throw new InvalidTodoIdException();
     }
 
     Todo todo =
-        todoRepository
-            .findByIdAndDeletedAtIsNull(todoId)
-            .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
+        todoRepository.findByIdAndDeletedAtIsNull(todoId).orElseThrow(TodoNotFoundException::new);
     if (!todo.isOwnedBy(userId)) {
-      throw new BusinessException(CommonErrorCode.FORBIDDEN);
+      throw new TodoAccessDeniedException(forbiddenCode);
     }
     return todo;
   }

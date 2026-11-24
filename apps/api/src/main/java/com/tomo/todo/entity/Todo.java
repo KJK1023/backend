@@ -1,5 +1,6 @@
 package com.tomo.todo.entity;
 
+import com.tomo.todo.exception.InvalidTodoEstimateException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -92,7 +93,7 @@ public class Todo {
    * @param reminderAt UTC 알림 시각, 미설정 시 null
    * @param createdAt UTC 생성 시각
    * @return 신규 To-do
-   * @throws IllegalArgumentException 예상 학습시간이 양수가 아닌 경우
+   * @throws InvalidTodoEstimateException 예상 학습시간이 양수가 아닌 경우
    */
   public static Todo create(
       String userId,
@@ -104,7 +105,7 @@ public class Todo {
       LocalDateTime reminderAt,
       LocalDateTime createdAt) {
     if (estimatedMinutes <= 0) {
-      throw new IllegalArgumentException("예상 학습시간은 0보다 커야 한다.");
+      throw new InvalidTodoEstimateException();
     }
 
     return new Todo(
