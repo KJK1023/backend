@@ -10,11 +10,14 @@ import org.springframework.context.annotation.Configuration;
 /** TOMO API 문서의 공통 정보를 설정한다. */
 @Configuration
 public class OpenApiConfig {
+  /** Refresh Token 인증을 위한 Bearer Security Scheme 이름. */
+  public static final String REFRESH_BEARER_AUTH = "refreshBearerAuth";
 
+  /** Access JWT 인증을 위한 Bearer Security Scheme 이름. */
   public static final String BEARER_AUTH = "bearerAuth";
 
   /**
-   * API 문서의 공통 정보와 JWT Bearer 인증 방식을 구성한다.
+   * API 문서의 공통 정보와 Access JWT 및 Refresh Bearer 인증 방식을 구성한다.
    *
    * @return TOMO OpenAPI 문서 설정
    */
@@ -29,6 +32,12 @@ public class OpenApiConfig {
                     new SecurityScheme()
                         .type(SecurityScheme.Type.HTTP)
                         .scheme("bearer")
-                        .bearerFormat("JWT")));
+                        .bearerFormat("JWT"))
+                .addSecuritySchemes(
+                    REFRESH_BEARER_AUTH,
+                    new SecurityScheme()
+                        .type(SecurityScheme.Type.HTTP)
+                        .scheme("bearer")
+                        .bearerFormat("opaque")));
   }
 }

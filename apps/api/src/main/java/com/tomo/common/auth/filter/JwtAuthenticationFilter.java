@@ -2,6 +2,7 @@ package com.tomo.common.auth.filter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import com.tomo.common.auth.exception.AuthErrorCode;
 import com.tomo.common.auth.session.AccessSessionValidator;
 import com.tomo.common.auth.token.AccessTokenClaims;
 import com.tomo.common.auth.token.AccessTokenProvider;
@@ -51,6 +52,31 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     this.accessTokenProvider = accessTokenProvider;
     this.accessSessionValidator = accessSessionValidator;
     this.objectWriter = objectMapper.writer();
+  }
+
+  /**
+   * Access JWT 검증을 적용하지 않을 공개 API 요청인지 판단한다.
+   *
+   * <p>요청 URI에서 컨텍스트 경로를 제외한 뒤 HTTP 메서드와 API 경로를 함께 비교한다. 재발급 요청은 별도의 Refresh Token 검증 절차를 수행한다.
+   *
+   * @param request HTTP 요청
+   * @return Access JWT 필터를 건너뛸 요청이면 true
+   */
+  @Override
+  protected boolean shouldNotFilter(HttpServletRequest request) {
+    String requestUri = request.getRequestURI();
+    String contextPath = request.getContextPath();
+    String path = requestUri.substring(contextPath.length());
+    String method = request.getMethod();
+
+    if ("POST".equals(method)) {
+      return "/api/v1/auth/google".equals(path)
+          || "/api/v1/auth/kakao".equals(path)
+          || "/api/v1/auth/refresh".equals(path)
+          || "/api/v1/users/me/profile".equals(path);
+    }
+
+    return "GET".equals(method) && "/api/v1/auth/nickname".equals(path);
   }
 
   /**
@@ -120,6 +146,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     UsernamePasswordAuthenticationToken authentication =
         new UsernamePasswordAuthenticationToken(claims.userId(), null, List.of());
 
+    authentication.setDetails(claims);
     SecurityContext context = SecurityContextHolder.createEmptyContext();
     context.setAuthentication(authentication);
     SecurityContextHolder.setContext(context);
@@ -127,6 +154,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     filterChain.doFilter(request, response);
   }
 
+  /**
+   * Access Token 인증 실패 시 공통 401 오류 응답을 작성한다.
+   *
+   * @param request HTTP 요청
+   * @param response HTTP 응답
+   * @param reason 내부 진단용 인증 거부 사유
+   * @throws IOException 오류 응답 직렬화에 실패한 경우
+   */
   private void reject(HttpServletRequest request, HttpServletResponse response, String reason)
       throws IOException {
 
@@ -140,6 +175,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     objectWriter.writeValue(
         response.getOutputStream(),
-        ErrorResponse.from(CommonErrorCode.INVALID_ACCESS_TOKEN, request.getRequestId()));
+        ErrorResponse.from(AuthErrorCode.INVALID_ACCESS_TOKEN, request.getRequestId()));
   }
 }

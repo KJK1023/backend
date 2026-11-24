@@ -219,7 +219,7 @@ class SecurityConfigTest {
     String token = accessTokenProvider.issue("user-id", 10L, NOW.plusSeconds(600));
 
     when(loginSessionService.isValidAccessSession("user-id", 10L))
-        .thenThrow(new IllegalStateException("DB unavailable"));
+        .thenThrow(new IllegalStateException("DB 연결 불가"));
 
     // when
     ResultActions result =
@@ -280,7 +280,7 @@ class SecurityConfigTest {
     MockHttpServletResponse response = new MockHttpServletResponse();
 
     // when
-    accessDeniedHandler.handle(request, response, new AccessDeniedException("Access denied"));
+    accessDeniedHandler.handle(request, response, new AccessDeniedException("접근 권한 없음"));
 
     // then
     assertThat(response.getStatus()).isEqualTo(403);
@@ -300,6 +300,36 @@ class SecurityConfigTest {
 
     // then
     result.andExpect(status().isForbidden()).andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "/api/v1/auth/google",
+        "/api/v1/auth/kakao",
+        "/api/v1/auth/refresh",
+        "/api/v1/users/me/profile"
+      })
+  @DisplayName("소셜·가입·재발급 POST 경로는 Access JWT 필터 없이 진입할 수 있다")
+  void permitsPublicAuthPosts(String path) throws Exception {
+    // when
+    ResultActions result =
+        mockMvc.perform(post(path).header(HttpHeaders.AUTHORIZATION, "Bearer invalid-token"));
+
+    // then
+    result.andExpect(status().isOk()).andExpect(content().string("ok"));
+  }
+
+  @Test
+  @DisplayName("닉네임 확인 GET 경로는 Access JWT 필터 없이 진입할 수 있다")
+  void permitsNicknameGet() throws Exception {
+    // when
+    ResultActions result =
+        mockMvc.perform(
+            get("/api/v1/auth/nickname").header(HttpHeaders.AUTHORIZATION, "Bearer signup-token"));
+
+    // then
+    result.andExpect(status().isOk()).andExpect(content().string("ok"));
   }
 
   @RestController
@@ -334,7 +364,22 @@ class SecurityConfigTest {
 
     @GetMapping("/api/denied")
     String denied() {
-      throw new AccessDeniedException("Access denied");
+      throw new AccessDeniedException("접근 권한 없음");
+    }
+
+    @PostMapping({
+      "/api/v1/auth/google",
+      "/api/v1/auth/kakao",
+      "/api/v1/auth/refresh",
+      "/api/v1/users/me/profile"
+    })
+    String publicAuthPost() {
+      return "ok";
+    }
+
+    @GetMapping("/api/v1/auth/nickname")
+    String publicNicknameGet() {
+      return "ok";
     }
   }
 
