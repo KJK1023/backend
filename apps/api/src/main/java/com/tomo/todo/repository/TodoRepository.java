@@ -9,20 +9,18 @@ public interface TodoRepository extends Repository<Todo, Long> {
   /**
    * To-do를 저장한다.
    *
-   * @param <S> 저장할 To-do 타입
    * @param entity 저장할 To-do
    * @return 저장된 To-do
    */
-  <S extends Todo> S save(S entity);
+  Todo save(Todo entity);
 
   /**
    * To-do를 저장하고 변경 내용을 DB에 반영한다.
    *
-   * @param <S> 저장할 To-do 타입
    * @param entity 저장할 To-do
    * @return 저장된 To-do
    */
-  <S extends Todo> S saveAndFlush(S entity);
+  Todo saveAndFlush(Todo entity);
 
   /**
    * 삭제되지 않은 To-do를 조회한다. 소유권은 호출 측에서 별도로 검증한다.

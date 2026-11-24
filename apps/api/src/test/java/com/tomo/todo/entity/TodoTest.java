@@ -1,11 +1,9 @@
-package com.tomo.todo;
+package com.tomo.todo.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.tomo.common.exception.CommonErrorCode;
-import com.tomo.todo.entity.Todo;
-import com.tomo.todo.entity.TodoPriority;
 import com.tomo.todo.exception.InvalidTodoEstimateException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;

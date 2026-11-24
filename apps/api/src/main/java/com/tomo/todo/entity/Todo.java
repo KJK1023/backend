@@ -8,12 +8,10 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.Objects;
 
 /** todos 테이블에 대응하며 다른 Aggregate는 식별자로 참조하는 To-do 엔티티. */
@@ -110,11 +108,6 @@ public class Todo {
 
     return new Todo(
         userId, title, categoryName, priority, dueDate, estimatedMinutes, reminderAt, createdAt);
-  }
-
-  @PreUpdate
-  private void updateTimestamp() {
-    updatedAt = LocalDateTime.now(ZoneOffset.UTC);
   }
 
   /**
