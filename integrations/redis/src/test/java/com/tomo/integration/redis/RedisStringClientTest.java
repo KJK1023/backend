@@ -1,7 +1,6 @@
 package com.tomo.integration.redis;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -85,20 +84,54 @@ class RedisStringClientTest {
   }
 
   @Test
-  @DisplayName("폐기된 세션의 재발급을 차단한다")
-  void rejectsReissueForRevokedSession() {
+  @DisplayName("Rotation Lua 결과 코드를 Redis 클라이언트가 그대로 전달한다")
+  void returnsRotationResult() {
     // given
+    when(redisTemplate.execute(
+            org.mockito.ArgumentMatchers.<RedisScript<Long>>any(),
+            eq(List.of("auth:refresh:session:10", "auth:refresh:session:10:history")),
+            eq("a".repeat(64)),
+            eq("b".repeat(64)),
+            eq("604800000"),
+            eq("10000"),
+            eq("1")))
+        .thenReturn(1L);
     RedisStringClient client = new RedisStringClient(redisTemplate);
 
-    when(redisTemplate.execute(
-            any(RedisScript.class), eq(List.of("key")), eq("__REVOKED__"), eq("new"), eq("60000")))
-        .thenReturn(0L);
-
     // when
-    boolean replaced =
-        client.replaceUnlessRevoked("key", "__REVOKED__", "new", Duration.ofMinutes(1));
+    long status =
+        client.rotateWithHistory(
+            "auth:refresh:session:10",
+            "a".repeat(64),
+            "b".repeat(64),
+            Duration.ofDays(7),
+            Duration.ofSeconds(10),
+            true);
 
     // then
-    assertThat(replaced).isFalse();
+    assertThat(status).isEqualTo(1L);
+  }
+
+  @Test
+  @DisplayName("조건부 Redis 토큰 폐기 성공 결과를 반환한다")
+  void revokesMatchingHash() {
+    // given
+    when(redisTemplate.execute(
+            org.mockito.ArgumentMatchers.<RedisScript<Long>>any(),
+            eq(List.of("auth:refresh:session:10", "auth:refresh:session:10:history")),
+            eq("a".repeat(64)),
+            eq("__REVOKED__"),
+            eq("604800000")))
+        .thenReturn(1L);
+    RedisStringClient client = new RedisStringClient(redisTemplate);
+
+    // when
+    boolean revoked =
+        client.revokeIfCurrentMatches(
+            "auth:refresh:session:10", "a".repeat(64),
+            "__REVOKED__", Duration.ofDays(7));
+
+    // then
+    assertThat(revoked).isTrue();
   }
 }

@@ -32,7 +32,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     ErrorCode errorCode = exception.getErrorCode();
 
-    return ResponseEntity.status(errorCode.getHttpStatus())
+    if (errorCode.httpStatus() >= 500) {
+      LOG.error("업무 처리 중 서버 오류. errorCode={}", errorCode.code(), exception);
+    }
+
+    return ResponseEntity.status(errorCode.httpStatus())
         .body(ErrorResponse.from(errorCode, request.getRequestId()));
   }
 
@@ -46,8 +50,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler(AccessDeniedException.class)
   public ResponseEntity<ErrorResponse> handleAccessDeniedException(
       AccessDeniedException exception, HttpServletRequest request) {
-    return ResponseEntity.status(ErrorCode.FORBIDDEN.getHttpStatus())
-        .body(ErrorResponse.from(ErrorCode.FORBIDDEN, request.getRequestId()));
+    return ResponseEntity.status(CommonErrorCode.FORBIDDEN.httpStatus())
+        .body(ErrorResponse.from(CommonErrorCode.FORBIDDEN, request.getRequestId()));
   }
 
   @Override
@@ -60,22 +64,22 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     ErrorCode errorCode =
         switch (statusCode.value()) {
-          case 400 -> ErrorCode.INVALID_REQUEST;
-          case 401 -> ErrorCode.UNAUTHORIZED;
-          case 403 -> ErrorCode.FORBIDDEN;
-          case 404 -> ErrorCode.RESOURCE_NOT_FOUND;
-          case 409 -> ErrorCode.RESOURCE_CONFLICT;
-          case 500 -> ErrorCode.INTERNAL_SERVER_ERROR;
+          case 400 -> CommonErrorCode.INVALID_REQUEST;
+          case 401 -> CommonErrorCode.UNAUTHORIZED;
+          case 403 -> CommonErrorCode.FORBIDDEN;
+          case 404 -> CommonErrorCode.RESOURCE_NOT_FOUND;
+          case 409 -> CommonErrorCode.RESOURCE_CONFLICT;
+          case 500 -> CommonErrorCode.INTERNAL_SERVER_ERROR;
           default ->
               statusCode.is4xxClientError()
-                  ? ErrorCode.INVALID_REQUEST
-                  : ErrorCode.INTERNAL_SERVER_ERROR;
+                  ? CommonErrorCode.INVALID_REQUEST
+                  : CommonErrorCode.INTERNAL_SERVER_ERROR;
         };
 
     String requestId = ((ServletWebRequest) request).getRequest().getRequestId();
 
     if (statusCode.is5xxServerError()) {
-      LOG.error("서버 오류 발생. requestId={}", requestId, exception);
+      LOG.error("MVC 요청 처리 중 서버 오류. status={}", statusCode.value(), exception);
     }
 
     return super.handleExceptionInternal(
@@ -93,12 +97,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   public ResponseEntity<ErrorResponse> handleUnexpectedException(
       Exception exception, HttpServletRequest request) {
 
-    ErrorCode errorCode = ErrorCode.INTERNAL_SERVER_ERROR;
+    ErrorCode errorCode = CommonErrorCode.INTERNAL_SERVER_ERROR;
     String requestId = request.getRequestId();
 
-    LOG.error("서버 오류 발생. requestId={}", requestId, exception);
+    LOG.error("예상하지 못한 서버 오류 발생", exception);
 
-    return ResponseEntity.status(errorCode.getHttpStatus())
+    return ResponseEntity.status(errorCode.httpStatus())
         .body(ErrorResponse.from(errorCode, requestId));
   }
 }

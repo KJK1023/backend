@@ -1,7 +1,7 @@
 package com.tomo.todo.service;
 
 import com.tomo.common.exception.BusinessException;
-import com.tomo.common.exception.ErrorCode;
+import com.tomo.common.exception.CommonErrorCode;
 import com.tomo.todo.entity.Todo;
 import com.tomo.todo.repository.TodoRepository;
 import org.springframework.stereotype.Service;
@@ -33,18 +33,18 @@ public class TodoAccessService {
    */
   public Todo getOwnedTodo(String userId, Long todoId) {
     if (userId == null || userId.isBlank()) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
+      throw new BusinessException(CommonErrorCode.INVALID_REQUEST);
     }
     if (todoId == null || todoId <= 0) {
-      throw new BusinessException(ErrorCode.INVALID_REQUEST);
+      throw new BusinessException(CommonErrorCode.INVALID_REQUEST);
     }
 
     Todo todo =
         todoRepository
             .findByIdAndDeletedAtIsNull(todoId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+            .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
     if (!todo.isOwnedBy(userId)) {
-      throw new BusinessException(ErrorCode.FORBIDDEN);
+      throw new BusinessException(CommonErrorCode.FORBIDDEN);
     }
     return todo;
   }

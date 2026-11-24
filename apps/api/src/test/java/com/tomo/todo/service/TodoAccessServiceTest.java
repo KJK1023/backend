@@ -6,7 +6,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.tomo.common.exception.BusinessException;
-import com.tomo.common.exception.ErrorCode;
+import com.tomo.common.exception.CommonErrorCode;
 import com.tomo.todo.entity.Todo;
 import com.tomo.todo.entity.TodoPriority;
 import com.tomo.todo.repository.TodoRepository;
@@ -77,8 +77,8 @@ class TodoAccessServiceTest {
     assertThatThrownBy(() -> service.getOwnedTodo("another-user", 1L))
         .isInstanceOf(BusinessException.class)
         .extracting("errorCode")
-        .isEqualTo(ErrorCode.FORBIDDEN);
-    assertThat(ErrorCode.FORBIDDEN.getHttpStatus()).isEqualTo(403);
+        .isEqualTo(CommonErrorCode.FORBIDDEN);
+    assertThat(CommonErrorCode.FORBIDDEN.httpStatus()).isEqualTo(403);
   }
 
   @Test
@@ -92,8 +92,8 @@ class TodoAccessServiceTest {
     assertThatThrownBy(() -> service.getOwnedTodo("owner", 1L))
         .isInstanceOf(BusinessException.class)
         .extracting("errorCode")
-        .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
-    assertThat(ErrorCode.RESOURCE_NOT_FOUND.getHttpStatus()).isEqualTo(404);
+        .isEqualTo(CommonErrorCode.RESOURCE_NOT_FOUND);
+    assertThat(CommonErrorCode.RESOURCE_NOT_FOUND.httpStatus()).isEqualTo(404);
   }
 
   @ParameterizedTest
@@ -106,7 +106,7 @@ class TodoAccessServiceTest {
     assertThatThrownBy(() -> service.getOwnedTodo("owner", todoId))
         .isInstanceOf(BusinessException.class)
         .extracting("errorCode")
-        .isEqualTo(ErrorCode.INVALID_REQUEST);
+        .isEqualTo(CommonErrorCode.INVALID_REQUEST);
     verifyNoInteractions(todoRepository);
   }
 
@@ -120,7 +120,7 @@ class TodoAccessServiceTest {
     assertThatThrownBy(() -> service.getOwnedTodo(userId, 1L))
         .isInstanceOf(BusinessException.class)
         .extracting("errorCode")
-        .isEqualTo(ErrorCode.INVALID_REQUEST);
+        .isEqualTo(CommonErrorCode.INVALID_REQUEST);
     verifyNoInteractions(todoRepository);
   }
 }

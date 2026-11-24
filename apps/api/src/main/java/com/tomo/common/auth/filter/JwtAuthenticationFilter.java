@@ -2,11 +2,12 @@ package com.tomo.common.auth.filter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import com.tomo.common.auth.exception.AuthErrorCode;
 import com.tomo.common.auth.session.AccessSessionValidator;
 import com.tomo.common.auth.token.AccessTokenClaims;
 import com.tomo.common.auth.token.AccessTokenProvider;
 import com.tomo.common.exception.BusinessException;
-import com.tomo.common.exception.ErrorCode;
+import com.tomo.common.exception.CommonErrorCode;
 import com.tomo.common.response.ErrorResponse;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -54,6 +55,31 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
   }
 
   /**
+   * Access JWT 검증을 적용하지 않을 공개 API 요청인지 판단한다.
+   *
+   * <p>요청 URI에서 컨텍스트 경로를 제외한 뒤 HTTP 메서드와 API 경로를 함께 비교한다. 재발급 요청은 별도의 Refresh Token 검증 절차를 수행한다.
+   *
+   * @param request HTTP 요청
+   * @return Access JWT 필터를 건너뛸 요청이면 true
+   */
+  @Override
+  protected boolean shouldNotFilter(HttpServletRequest request) {
+    String requestUri = request.getRequestURI();
+    String contextPath = request.getContextPath();
+    String path = requestUri.substring(contextPath.length());
+    String method = request.getMethod();
+
+    if ("POST".equals(method)) {
+      return "/api/v1/auth/google".equals(path)
+          || "/api/v1/auth/kakao".equals(path)
+          || "/api/v1/auth/refresh".equals(path)
+          || "/api/v1/users/me/profile".equals(path);
+    }
+
+    return "GET".equals(method) && "/api/v1/auth/nickname".equals(path);
+  }
+
+  /**
    * HTTP 요청의 Access Token과 로그인 세션을 검증하여 인증 정보를 등록한다.
    *
    * <p>Authorization 헤더가 없으면 후속 보안 필터에 인증 판단을 위임한다. 토큰 또는 세션 검증에 실패하면 공통 401 오류 응답을 반환한다.
@@ -79,7 +105,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     Matcher matcher = BEARER_TOKEN_PATTERN.matcher(authorization);
 
     if (!matcher.matches()) {
-      reject(request, response);
+      reject(request, response, "INVALID_BEARER_FORMAT");
       return;
     }
 
@@ -88,7 +114,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     try {
       claims = accessTokenProvider.verify(matcher.group(1));
     } catch (BusinessException exception) {
-      reject(request, response);
+      reject(request, response, "TOKEN_VERIFICATION_FAILED");
       return;
     }
 
@@ -100,7 +126,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     } catch (RuntimeException exception) {
       SecurityContextHolder.clearContext();
 
-      LOG.error("로그인 세션 검증 실패. requestId={}", request.getRequestId(), exception);
+      LOG.error("로그인 세션 검증 중 서버 오류", exception);
 
       response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
       response.setContentType(MediaType.APPLICATION_JSON_VALUE);
@@ -108,18 +134,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
       objectWriter.writeValue(
           response.getOutputStream(),
-          ErrorResponse.from(ErrorCode.INTERNAL_SERVER_ERROR, request.getRequestId()));
+          ErrorResponse.from(CommonErrorCode.INTERNAL_SERVER_ERROR, request.getRequestId()));
       return;
     }
 
     if (!validSession) {
-      reject(request, response);
+      reject(request, response, "INVALID_LOGIN_SESSION");
       return;
     }
 
     UsernamePasswordAuthenticationToken authentication =
         new UsernamePasswordAuthenticationToken(claims.userId(), null, List.of());
 
+    authentication.setDetails(claims);
     SecurityContext context = SecurityContextHolder.createEmptyContext();
     context.setAuthentication(authentication);
     SecurityContextHolder.setContext(context);
@@ -127,8 +154,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     filterChain.doFilter(request, response);
   }
 
-  private void reject(HttpServletRequest request, HttpServletResponse response) throws IOException {
+  /**
+   * Access Token 인증 실패 시 공통 401 오류 응답을 작성한다.
+   *
+   * @param request HTTP 요청
+   * @param response HTTP 응답
+   * @param reason 내부 진단용 인증 거부 사유
+   * @throws IOException 오류 응답 직렬화에 실패한 경우
+   */
+  private void reject(HttpServletRequest request, HttpServletResponse response, String reason)
+      throws IOException {
+
     SecurityContextHolder.clearContext();
+
+    LOG.debug("Access Token 인증 거부. reason={}", reason);
 
     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
     response.setContentType(MediaType.APPLICATION_JSON_VALUE);
@@ -136,6 +175,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     objectWriter.writeValue(
         response.getOutputStream(),
-        ErrorResponse.from(ErrorCode.INVALID_ACCESS_TOKEN, request.getRequestId()));
+        ErrorResponse.from(AuthErrorCode.INVALID_ACCESS_TOKEN, request.getRequestId()));
   }
 }
