@@ -6,7 +6,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tomo.common.exception.BusinessException;
-import com.tomo.common.exception.CommonErrorCode;
 import com.tomo.common.exception.GlobalExceptionHandler;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
@@ -101,7 +100,7 @@ class TodoExceptionHandlerTest {
                 .path("error")
                 .path("code")
                 .asText())
-        .isEqualTo(CommonErrorCode.INVALID_REQUEST.code());
+        .isEqualTo(TodoErrorCode.INVALID_TODO_ESTIMATE.code());
   }
 
   private static Stream<Arguments> errorContracts() {
@@ -115,6 +114,7 @@ class TodoExceptionHandlerTest {
         Arguments.of(TodoErrorCode.TODO_NOT_FOUND, "TODO_NOT_FOUND", 404),
         Arguments.of(TodoErrorCode.TODO_UPDATE_CONFLICT, "TODO_UPDATE_CONFLICT", 409),
         Arguments.of(TodoErrorCode.TODO_DELETE_CONFLICT, "TODO_DELETE_CONFLICT", 409),
+        Arguments.of(TodoErrorCode.INVALID_TODO_ESTIMATE, "INVALID_TODO_ESTIMATE", 400),
         Arguments.of(TodoErrorCode.TODO_STATE_CONFLICT, "TODO_STATE_CONFLICT", 409));
   }
 

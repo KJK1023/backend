@@ -3,8 +3,8 @@ package com.tomo.todo.entity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.tomo.common.exception.CommonErrorCode;
 import com.tomo.todo.exception.InvalidTodoEstimateException;
+import com.tomo.todo.exception.TodoErrorCode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.DisplayName;
@@ -23,31 +23,11 @@ class TodoTest {
         Todo.create(
             "owner", "자료구조", "전공", TodoPriority.HIGH, LocalDate.of(2026, 11, 14), 60, null, now);
     // then
-    assertThat(todo.isCompleted()).isFalse();
-    assertThat(todo.isDeleted()).isFalse();
+    assertThat(todo.getCompletedAt()).isNull();
+    assertThat(todo.getDeletedAt()).isNull();
     assertThat(todo.getReminderAt()).isNull();
     assertThat(todo.getCreatedAt()).isEqualTo(now);
     assertThat(todo.getUpdatedAt()).isEqualTo(now);
-  }
-
-  @Test
-  @DisplayName("소유자만 일치하며 타인과 식별값이 없는 사용자는 일치하지 않는다")
-  void checksOwnership() {
-    // given
-    Todo todo =
-        Todo.create(
-            "owner",
-            "자료구조",
-            "전공",
-            TodoPriority.HIGH,
-            LocalDate.of(2026, 11, 14),
-            60,
-            null,
-            LocalDateTime.of(2026, 11, 13, 12, 0));
-    // then
-    assertThat(todo.isOwnedBy("owner")).isTrue();
-    assertThat(todo.isOwnedBy("other")).isFalse();
-    assertThat(todo.isOwnedBy(null)).isFalse();
   }
 
   @ParameterizedTest
@@ -69,7 +49,7 @@ class TodoTest {
                     LocalDateTime.of(2026, 11, 13, 12, 0)))
         .isInstanceOf(InvalidTodoEstimateException.class)
         .extracting("errorCode")
-        .isEqualTo(CommonErrorCode.INVALID_REQUEST);
+        .isEqualTo(TodoErrorCode.INVALID_TODO_ESTIMATE);
   }
 
   @Test

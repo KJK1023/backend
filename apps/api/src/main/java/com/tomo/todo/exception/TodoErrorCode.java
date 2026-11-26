@@ -7,6 +7,9 @@ public enum TodoErrorCode implements ErrorCode {
   /** todoId가 올바르지 않거나 유효한 ID 형식이 아닙니다. */
   INVALID_TODO_ID(400, "todoId가 올바르지 않거나 유효한 ID 형식이 아닙니다."),
 
+  /** 예상 학습시간이 양수가 아닌 경우입니다. */
+  INVALID_TODO_ESTIMATE(400, "예상 학습시간은 1분 이상이어야 합니다."),
+
   /** To-do를 생성할 권한이 없습니다. */
   TODO_CREATE_FORBIDDEN(403, "To-do를 생성할 권한이 없습니다."),
 

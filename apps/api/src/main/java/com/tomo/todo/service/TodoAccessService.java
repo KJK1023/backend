@@ -96,7 +96,7 @@ public class TodoAccessService {
 
     Todo todo =
         todoRepository.findByIdAndDeletedAtIsNull(todoId).orElseThrow(TodoNotFoundException::new);
-    if (!todo.isOwnedBy(userId)) {
+    if (!userId.equals(todo.getUserId())) {
       throw new TodoAccessDeniedException(forbiddenCode);
     }
     return todo;

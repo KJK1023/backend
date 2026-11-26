@@ -12,7 +12,6 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Objects;
 
 /** todos 테이블에 대응하며 다른 Aggregate는 식별자로 참조하는 To-do 엔티티. */
 @Entity
@@ -108,34 +107,6 @@ public class Todo {
 
     return new Todo(
         userId, title, categoryName, priority, dueDate, estimatedMinutes, reminderAt, createdAt);
-  }
-
-  /**
-   * 지정한 사용자가 이 To-do의 소유자인지 확인한다.
-   *
-   * @param candidateUserId 확인할 사용자 식별자
-   * @return 소유자이면 true
-   */
-  public boolean isOwnedBy(String candidateUserId) {
-    return userId != null && Objects.equals(userId, candidateUserId);
-  }
-
-  /**
-   * 완료 시각 유무로 완료 여부를 반환한다.
-   *
-   * @return 완료되었으면 true
-   */
-  public boolean isCompleted() {
-    return completedAt != null;
-  }
-
-  /**
-   * 삭제 시각 유무로 삭제 여부를 반환한다.
-   *
-   * @return 삭제되었으면 true
-   */
-  public boolean isDeleted() {
-    return deletedAt != null;
   }
 
   public Long getId() {
